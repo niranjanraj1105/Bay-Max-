@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bay Max</title>
+
+  <!-- Minimal, modern UI -->
+  <style>
+    :root{
+      --bg:#eef2f7;
+      --card:#ffffff;
+      --ring:#e6e9ef;
+      --primary:#0b74ff;
+      --bot:#10a35a;
+      --text:#0f172a;
+      --muted:#64748b;
+      --user-bubble:#0b74ff;
+      --bot-bubble:#f1f5f9;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    .wrap{
+      max-width: 900px;
+      margin: 28px auto;
+      padding: 0 16px;
+    }
+
+    .chat{
+      height: calc(100vh - 56px - 28px*2);
+      min-height: 560px;
+      background:var(--card);
+      border:1px solid var(--ring);
+      border-radius: 16px;
+      display:flex;
+      flex-direction: column;
+      overflow:hidden;
+      box-shadow: 0 8px 24px rgba(15,23,42,.06);
+    }
+
+    .topbar{
+      padding:14px 18px;
+      text-align:center;
+      font-weight:700;
+      letter-spacing:.2px;
+      color:#fff;
+      background: linear-gradient(135deg, var(--primary), #6a5cff);
+    }
+
+    /* Messages area */
+    #messages{
+      flex:1;
+      overflow-y:auto;
+      padding: 18px 18px 0 18px;
+      background: linear-gradient(#fafcff, #f6f8fc);
+      display:flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* One row (wrapper) per message */
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .row.bot{justify-content:flex-start}
+    .row.user{justify-content:flex-end}
+
+    /* Avatars */
+    .avatar{
+      width:32px;height:32px;flex:0 0 32px;
+      border-radius:10px;
+      display:grid;place-items:center;
+      font-size:18px;color:#fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,.08);
+    }
+    .avatar.bot{background: var(--bot)}
+    .avatar.user{background: var(--user-bubble)}
+
+    /* Bubbles */
+    .bubble{
+      max-width: min(78ch, 78%);
+      padding:12px 14px;
+      border-radius:14px;
+      line-height:1.55;
+      word-wrap:break-word;
+      white-space:pre-wrap;
+      box-shadow: 0 1px 0 rgba(15,23,42,.06);
+    }
+    .bubble.user{
+      background: linear-gradient(135deg, var(--user-bubble), #5a8bff);
+      color:#fff;
+      border-bottom-right-radius: 6px;
+    }
+    .bubble.bot{
+      background: var(--bot-bubble);
+      color: var(--text);
+      border-bottom-left-radius: 6px;
+    }
+
+    /* Markdown inside bot bubble (after JS render) */
+    .bubble.bot h1,.bubble.bot h2,.bubble.bot h3{margin:.2em 0 .4em 0}
+    .bubble.bot h1{font-size:1.25rem}
+    .bubble.bot h2{font-size:1.15rem}
+    .bubble.bot h3{font-size:1.05rem}
+    .bubble.bot p{margin: .5em 0}
+    .bubble.bot ul,.bubble.bot ol{margin:.4em 0 .6em 1.2em}
+    .bubble.bot code{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size:.92em;
+      background:#f0f3f7;
+      padding:.15em .35em;
+      border-radius:6px;
+    }
+    .bubble.bot pre{
+      background:#0f172a;
+      color:#e5e7eb;
+      padding:12px;
+      border-radius:10px;
+      overflow:auto;
+      white-space:pre;
+      margin:.4em 0;
+    }
+    .bubble.bot pre code{
+      background:transparent;
+      color:inherit;
+      padding:0;
+    }
+
+    /* Composer */
+    .composer{
+      display:flex;
+      gap:10px;
+      padding: 12px;
+      border-top:1px solid var(--ring);
+      background: #fff;
+    }
+    .composer textarea{
+      flex:1;
+      resize: none;
+      min-height:44px;
+      max-height: 140px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border:1px solid var(--ring);
+      outline:none;
+      font: inherit;
+      line-height:1.4;
+      background:#f9fbff;
+    }
+    .composer textarea:focus{
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(11,116,255,.12);
+      background:#fff;
+    }
+    .composer button{
+      padding: 0 18px;
+      border:0;
+      border-radius: 12px;
+      font-weight:600;
+      background: var(--primary);
+      color:#fff;
+      cursor:pointer;
+      min-width: 84px;
+      height:44px;
+      box-shadow: 0 4px 14px rgba(11,116,255,.25);
+    }
+    .composer button:hover{filter: brightness(.95)}
+    .composer button:disabled{opacity:.55; cursor:not-allowed; box-shadow:none}
+  </style>
+
+  <!-- Markdown renderer + sanitizer (safe and reliable) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="chat">
+      <div class="topbar" style="position:relative;">
+        <!-- Logo absolutely positioned on the left -->
+        <span style="position:absolute;left:18px;top:50%;transform:translateY(-50%);">
+          <svg width="36" height="36" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="30" cy="30" r="28" fill="#e6f0fa" stroke="#007bff" stroke-width="2"/>
+            <ellipse cx="30" cy="36" rx="18" ry="12" fill="#fff"/>
+            <circle cx="22" cy="28" r="4" fill="#007bff"/>
+            <circle cx="38" cy="28" r="4" fill="#007bff"/>
+            <rect x="26" y="16" width="8" height="6" rx="3" fill="#007bff"/>
+            <rect x="18" y="40" width="24" height="4" rx="2" fill="#b3d4fc"/>
+          </svg>
+        </span>
+        <span style="font-size:1.25em;font-weight:700;letter-spacing:.2px;">Bay Max</span>
+  <a href="/logout" style="position:absolute;right:18px;top:50%;transform:translateY(-50%);background:#fff;color:#0b74ff;border:none;border-radius:8px;padding:7px 20px;font-weight:600;font-size:1rem;text-decoration:none;box-shadow:0 2px 8px #b3d4fc;transition:background .2s;cursor:pointer;">Logout</a>
+      </div>
+
+      <div id="messages">
+        {% for msg in messages %}
+          {% if msg[0] == 'bot' %}
+            <div class="row bot">
+              <div class="avatar bot" title="Bot">🤖</div>
+              <!-- Store raw markdown safely as JSON in a data attribute -->
+              <div class="bubble bot" data-md='{{ msg[1] | tojson | safe }}'></div>
+            </div>
+          {% else %}
+            <div class="row user">
+              <div class="bubble user">{{ msg[1] | e }}</div>
+              <div class="avatar user" title="You">😊</div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      <form id="chat-form" class="composer" action="/chat" method="post">
+        <textarea id="user_input" name="user_input" placeholder="Type your message…" required></textarea>
+        <button id="sendBtn" type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Wait until both libraries are loaded (they're defer-ed) and DOM is ready
+    window.addEventListener('DOMContentLoaded', function(){
+      // Render Markdown -> safe HTML for all bot bubbles
+      document.querySelectorAll('.bubble.bot[data-md]').forEach(function(el){
+        try{
+          const raw = JSON.parse(el.getAttribute('data-md') || '""');
+          const html = marked.parse(raw, { gfm: true, breaks: true });
+          el.innerHTML = DOMPurify.sanitize(html);
+        }catch(e){
+          // Fallback: show escaped text if parsing fails
+          el.textContent = el.getAttribute('data-md');
+        }
+      });
+
+      // Auto-scroll to newest message
+      const box = document.getElementById('messages');
+      box.scrollTop = box.scrollHeight;
+
+      // Enter to send, Shift+Enter for newline
+      const form = document.getElementById('chat-form');
+      const input = document.getElementById('user_input');
+      const send = document.getElementById('sendBtn');
+
+      input.addEventListener('input', () => {
+        send.disabled = input.value.trim().length === 0;
+        // auto-grow textarea
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+      });
+      input.dispatchEvent(new Event('input'));
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey){
+          e.preventDefault();
+          if (input.value.trim().length) form.submit();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
